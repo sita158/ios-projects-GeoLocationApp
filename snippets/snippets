@@ -1,0 +1,142 @@
+//For the global variables section of the ViewController.swift file when adding the WCD Service
+var currentWeatherLabel:UILabel!
+
+//For the viewDidLoad() function of the ViewController.swift file when adding the WCD Service
+let label2 = UILabel(frame: CGRect(x:0, y:currentLocationLabel.frame.maxY+20, width: view.frame.width, height:20))
+        label2.text = "The weather at that location is:"
+        label2.textAlignment = NSTextAlignment.center
+        label2.font = UIFont(name: "ArialMT", size: 14)
+        view.addSubview(label2)
+        
+        currentWeatherLabel = UILabel(frame: CGRect(x: 0, y: label2.frame.maxY+20, width: view.frame.width, height: 20))
+        currentWeatherLabel.text = "--Weather--"
+        currentWeatherLabel.textAlignment = NSTextAlignment.center
+        currentWeatherLabel.font = UIFont(name: "ArialMT", size: 14)
+        view.addSubview(currentWeatherLabel)
+        
+//To change the location of the updateButton in the viewDidLoad() function of the
+//ViewController.swift file when adding the WCD Service
+let updateButton = UIButton(frame: CGRect(x: 50, y: currentWeatherLabel.frame.maxY+30, width: view.frame.width-100, height: 30)
+
+//For the ViewController.swift file when adding the WCD Service
+func getCurrentWeather(coordinate:CLLocationCoordinate2D){
+        let urlString = "<WeatherCompanyDataServiceURL>/api/weather/v1/geocode/\(coordinate.latitude)/\(coordinate.longitude)/observations.json"
+        if let url = URL(string: urlString){
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 25
+            request.httpMethod = "GET"
+            
+            let task = URLSession.shared.dataTask(with: request, completionHandler: { (data : Data?, response :URLResponse?, error : Error?) in
+                
+                if error == nil{
+                    let httpResponse = response as! HTTPURLResponse
+                    
+                    if httpResponse.statusCode == 200 {
+                        //OK
+                        var dictionary : NSDictionary?
+                        
+                        do{
+                            dictionary = try JSONSerialization.jsonObject(with: data!, options: JSONSerialization.ReadingOptions.allowFragments) as? NSDictionary
+                        }catch{
+                            
+                        }
+                        
+                        if let jsonDict = dictionary{
+                            print ("jsonDict: \(jsonDict)")
+                            let metadataDict = jsonDict["metadata"] as! NSDictionary
+                            let code = metadataDict["status_code"] as! NSNumber
+                            print("Status code: \(code.intValue)")
+                            if code.intValue == 200{
+                                let dataDict = jsonDict["observation"] as! NSDictionary
+                                let temp = dataDict["temp"] as! NSNumber
+                                let wx_phrase = dataDict["wx_phrase"] as! NSString
+                                        
+                                DispatchQueue.main.async {
+                                    self.currentWeatherLabel.text="\(temp.intValue)°F, \(wx_phrase)"
+                                }
+                                        
+                            }else{
+                                self.showAlert(alertTitle: "Alerta", message: "Error al accesar el servicio de WCD")
+                            }
+                            
+                        }else{
+                            self.showAlert(alertTitle: "Alerta", message: "Error en Serialización")
+                        }
+                    }else{
+                        var httpErrorMessage = ""
+                        switch httpResponse.statusCode{
+                        case 404:
+                            httpErrorMessage = "Error 404. Servidor no encontrado"
+                        case 500:
+                            httpErrorMessage = "Error 500. Error interno"
+                        default:
+                            httpErrorMessage = "Error desconocido"
+                        }
+                        
+                        self.showAlert(alertTitle: "Alerta", message: httpErrorMessage)
+                    }
+                    
+                }else{
+                    let iError = error! as NSError
+                    
+                    var nsErrorMessage = ""
+                    
+                    switch iError.code{
+                    case -1001:
+                        nsErrorMessage = "Error 1001. Expiró el tiempo de conexión"
+                    case -1009:
+                        nsErrorMessage = "Error 1009. Revisa tu conexión a Internet"
+                    default:
+                        nsErrorMessage = "Error desconocido"
+                    }
+                    self.showAlert(alertTitle: "Alerta", message: nsErrorMessage)
+                }
+            })
+            task.resume()
+        }
+    }
+    
+func showAlert (alertTitle: String, message: String){
+        DispatchQueue.main.async {
+            let alertController = UIAlertController(title: alertTitle, message: message, preferredStyle: UIAlertControllerStyle.alert)
+            
+            alertController.addAction(UIAlertAction(title: "Aceptar", style: UIAlertActionStyle.default, handler: { (action) in
+                
+            }))
+            
+            self.present(alertController, animated: true, completion: nil)
+        }
+    }
+
+//For the updateUI() function of the ViewController.swift file when adding the WCD Service
+self.getCurrentWeather(coordinate: coordinate)
+
+//For the import section of the ViewController.swift file when adding the WT2S Service
+import TextToSpeechV1
+import AVFoundation
+
+//For the global variables section of the ViewController.swift file when adding the WT2S Service
+var audioPlayer = AVAudioPlayer()
+
+//For the viewDidLoad function of the ViewController.swift file when adding the WT2S Service
+let readButton = UIButton(frame: CGRect(x: 50, y: updateButton.frame.maxY+30, width: view.frame.width-100, height: 30))
+readButton.setTitle("Read", for: UIControlState.normal)
+readButton.setTitleColor(UIColor.white, for: UIControlState.normal)
+readButton.backgroundColor = UIColor.purple
+readButton.addTarget(self, action: #selector(readAddress), for: UIControlEvents.touchUpInside)
+view.addSubview(readButton)
+
+//For the ViewController.swift file when adding the WT2S Service
+func readAddress(){
+        let username = "<username>"
+        let password = "<password>"
+        let textToSpeech = TextToSpeech(username: username, password: password)
+        
+        let text = self.currentLocationLabel.text
+        let failure = { (error: Error) in print(error) }
+        textToSpeech.synthesize(text!, voice: SynthesisVoice.es_Laura.rawValue, failure: failure) { data in
+            self.audioPlayer = try! AVAudioPlayer(data: data)
+            self.audioPlayer.prepareToPlay()
+            self.audioPlayer.play()
+        }
+    }
